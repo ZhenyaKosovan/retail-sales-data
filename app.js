@@ -42,21 +42,27 @@ function disableDownloadButton() {
 // Fetch retail sales data from ONS API
 async function fetchRetailSalesData() {
     try {
+        console.log('fetchRetailSalesData: Starting...');
         // Using the retail-sales-index dataset directly
         const datasetId = 'retail-sales-index';
+        const metadataUrl = `${ONS_API_BASE}/datasets/${datasetId}`;
+        console.log('Fetching metadata from:', metadataUrl);
 
         // Fetch dataset metadata to get latest edition and version
-        const datasetResponse = await fetch(`${ONS_API_BASE}/datasets/${datasetId}`, {
+        const datasetResponse = await fetch(metadataUrl, {
             headers: {
                 'Accept': 'application/json'
             }
         });
+
+        console.log('Metadata response status:', datasetResponse.status);
 
         if (!datasetResponse.ok) {
             throw new Error(`HTTP error! status: ${datasetResponse.status}`);
         }
 
         const datasetInfo = await datasetResponse.json();
+        console.log('Metadata received:', datasetInfo.title);
 
         // Get the latest version information
         const latestVersion = datasetInfo.links?.latest_version;
@@ -74,26 +80,34 @@ async function fetchRetailSalesData() {
 
         const edition = versionMatch[1];
         const version = versionMatch[2];
+        console.log(`Latest version: ${edition}/v${version}`);
 
         // Construct CSV download URL
         const csvUrl = `https://download.ons.gov.uk/downloads/datasets/${datasetId}/editions/${edition}/versions/${version}.csv`;
+        console.log('Downloading CSV from:', csvUrl);
 
         // Fetch CSV data
         const csvResponse = await fetch(csvUrl);
+        console.log('CSV response status:', csvResponse.status);
 
         if (!csvResponse.ok) {
-            throw new Error(`HTTP error! status: ${csvResponse.status}`);
+            throw new Error(`CSV download failed! status: ${csvResponse.status}`);
         }
 
         const csvText = await csvResponse.text();
+        console.log(`CSV downloaded: ${(csvText.length / 1024 / 1024).toFixed(2)} MB`);
 
         // Process CSV into structured data
+        console.log('Parsing CSV data...');
         const processedData = parseCSVData(csvText);
+        console.log(`Parsed ${processedData.length} sectors`);
 
         return processedData;
 
     } catch (error) {
-        console.error('Error fetching retail sales data:', error);
+        console.error('❌ fetchRetailSalesData error:', error.message);
+        console.error('Error type:', error.name);
+        console.error('Full error:', error);
         throw error;
     }
 }
@@ -296,16 +310,21 @@ function getMockData() {
 
 // Render data grid
 function renderDataGrid(data) {
+    console.log('renderDataGrid called with data:', data ? data.length : 'null', 'items');
+
     if (!data || data.length === 0) {
+        console.log('No data to render');
         dataGrid.innerHTML = '<p class="no-data">No data available to display</p>';
         return;
     }
 
     // Clear existing content
     dataGrid.innerHTML = '';
+    console.log('Creating', data.length, 'data cards...');
 
     // Create card for each sector
-    data.forEach(item => {
+    data.forEach((item, index) => {
+        console.log(`Creating card ${index + 1}:`, item.sector);
         const card = document.createElement('div');
         card.className = 'data-card';
 
@@ -320,6 +339,9 @@ function renderDataGrid(data) {
 
         dataGrid.appendChild(card);
     });
+
+    console.log('✓ Rendered', data.length, 'cards to DOM');
+    console.log('dataGrid children count:', dataGrid.children.length);
 }
 
 // Download data as CSV
@@ -363,33 +385,52 @@ function downloadData() {
 
 // Handle retrieve data button click
 async function handleRetrieveData() {
+    console.log('=== Starting data retrieval ===');
     hideError();
     showSpinner();
     disableDownloadButton();
     dataGrid.innerHTML = '';
 
     try {
+        console.log('Attempting to fetch from API...');
         // Try to fetch from API
         const data = await fetchRetailSalesData();
+
+        console.log('Fetch successful, data length:', data ? data.length : 0);
 
         if (!data || data.length === 0) {
             throw new Error('No data returned from API');
         }
 
         retailSalesData = data;
+        console.log('Rendering data grid with', retailSalesData.length, 'items');
         renderDataGrid(retailSalesData);
         enableDownloadButton();
+        console.log('✓ Live data displayed successfully');
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('❌ Fetch failed:', error);
+        console.error('Error details:', error.message);
+        console.error('Stack trace:', error.stack);
 
         // Use mock data as fallback
+        console.log('Loading mock data as fallback...');
         showError('Unable to fetch live data from ONS API. Displaying sample data instead.');
         retailSalesData = getMockData();
-        renderDataGrid(retailSalesData);
-        enableDownloadButton();
+        console.log('Mock data loaded:', retailSalesData.length, 'items');
+        console.log('Mock data sample:', retailSalesData[0]);
+
+        try {
+            renderDataGrid(retailSalesData);
+            console.log('✓ Mock data rendered successfully');
+            enableDownloadButton();
+        } catch (renderError) {
+            console.error('❌ Failed to render mock data:', renderError);
+            console.error('Render error details:', renderError.message);
+        }
     } finally {
         hideSpinner();
+        console.log('=== Data retrieval complete ===');
     }
 }
 
