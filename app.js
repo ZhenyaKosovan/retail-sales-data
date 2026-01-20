@@ -82,18 +82,19 @@ async function fetchRetailSalesData() {
         const version = versionMatch[2];
         console.log(`Latest version: ${edition}/v${version}`);
 
-        // Construct CSV download URL - use static.ons.gov.uk directly to avoid redirect issues
-        const csvUrl = `https://static.ons.gov.uk/datasets/${datasetId}-${edition}-v${version}.csv`;
+        // Use download URL which has CORS enabled, but follows redirect automatically
+        const csvUrl = `https://download.ons.gov.uk/downloads/datasets/${datasetId}/editions/${edition}/versions/${version}.csv`;
         console.log('Downloading CSV from:', csvUrl);
 
-        // Fetch CSV data with mode: 'cors' to ensure CORS is handled
+        // Fetch CSV data - let browser handle redirect
         const csvResponse = await fetch(csvUrl, {
-            mode: 'cors',
+            redirect: 'follow',
             headers: {
-                'Accept': 'text/csv'
+                'Accept': 'text/csv, application/octet-stream, */*'
             }
         });
         console.log('CSV response status:', csvResponse.status);
+        console.log('CSV final URL:', csvResponse.url);
 
         if (!csvResponse.ok) {
             throw new Error(`CSV download failed! status: ${csvResponse.status}`);
