@@ -43,7 +43,6 @@ function disableDownloadButton() {
 async function fetchRetailSalesData() {
     try {
         // Using the retail-sales-index dataset directly
-        // Dataset ID from ONS: retail-sales-index
         const datasetId = 'retail-sales-index';
 
         // Fetch dataset metadata to get latest edition and version
@@ -60,7 +59,7 @@ async function fetchRetailSalesData() {
         const datasetInfo = await datasetResponse.json();
 
         // Get the latest version information
-        const latestVersion = datasetInfo.links?.latest_version || datasetInfo.links?.self;
+        const latestVersion = datasetInfo.links?.latest_version;
 
         if (!latestVersion) {
             throw new Error('Unable to find latest version information');
@@ -76,23 +75,20 @@ async function fetchRetailSalesData() {
         const edition = versionMatch[1];
         const version = versionMatch[2];
 
-        // Fetch observations data
-        const observationsUrl = `${ONS_API_BASE}/datasets/${datasetId}/editions/${edition}/versions/${version}/observations`;
+        // Construct CSV download URL
+        const csvUrl = `https://download.ons.gov.uk/downloads/datasets/${datasetId}/editions/${edition}/versions/${version}.csv`;
 
-        const observationsResponse = await fetch(observationsUrl, {
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
+        // Fetch CSV data
+        const csvResponse = await fetch(csvUrl);
 
-        if (!observationsResponse.ok) {
-            throw new Error(`HTTP error! status: ${observationsResponse.status}`);
+        if (!csvResponse.ok) {
+            throw new Error(`HTTP error! status: ${csvResponse.status}`);
         }
 
-        const observationsData = await observationsResponse.json();
+        const csvText = await csvResponse.text();
 
-        // Process observations into structured data
-        const processedData = processObservations(observationsData);
+        // Process CSV into structured data
+        const processedData = parseCSVData(csvText);
 
         return processedData;
 
@@ -102,35 +98,70 @@ async function fetchRetailSalesData() {
     }
 }
 
-// Process observations from API response
-function processObservations(observationsData) {
-    if (!observationsData || !observationsData.observations) {
-        throw new Error('No observations data available');
+// Parse CSV data and extract relevant information
+function parseCSVData(csvText) {
+    const lines = csvText.split('\n');
+
+    if (lines.length < 2) {
+        throw new Error('CSV file is empty or invalid');
     }
 
-    const observations = observationsData.observations;
+    // Parse header to get column indices
+    const header = lines[0].split(',');
+    const valueIdx = 0; // v4_1
+    const timeCodeIdx = 2; // mmm-yy
+    const timeLabelIdx = 3; // Time
+    const sectorCodeIdx = 6; // sic-unofficial
+    const sectorLabelIdx = 7; // UnofficialStandardIndustrialClassification
+    const pricesCodeIdx = 8; // type-of-prices
+    const pricesLabelIdx = 9; // Prices
 
-    // Group by sector and get the latest value for each
+    // Find the latest time period
+    const timeSet = new Set();
+    for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
+        if (cols.length > timeCodeIdx && cols[timeCodeIdx]) {
+            timeSet.add(cols[timeCodeIdx]);
+        }
+    }
+
+    // Get the latest time period (they're in format mmm-yy)
+    const latestTime = Array.from(timeSet).sort((a, b) => {
+        // Convert mmm-yy to date for comparison
+        const dateA = parseMonthYear(a);
+        const dateB = parseMonthYear(b);
+        return dateB - dateA;
+    })[0];
+
+    // Extract data for latest period with "chained-volume-of-retail-sales"
     const sectorMap = new Map();
 
-    observations.forEach(obs => {
-        const sector = obs.dimensions?.['retail-sector']?.label || obs.dimensions?.sector?.label || 'Unknown Sector';
-        const value = parseFloat(obs.observation) || 0;
-        const period = obs.dimensions?.time?.label || obs.dimensions?.['time-period']?.label || 'Unknown Period';
-        const unit = observationsData.unit_of_measure || 'Index';
+    for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i]);
 
-        // Keep track of latest observation for each sector
-        if (!sectorMap.has(sector) || new Date(period) > new Date(sectorMap.get(sector).period)) {
-            sectorMap.set(sector, {
-                sector,
-                value: value.toFixed(1),
-                period,
-                unit
-            });
+        if (cols.length <= pricesCodeIdx) continue;
+
+        const timeCode = cols[timeCodeIdx];
+        const pricesCode = cols[pricesCodeIdx];
+
+        // Filter for latest time and chained volume metric
+        if (timeCode === latestTime && pricesCode === 'chained-volume-of-retail-sales') {
+            const value = cols[valueIdx];
+            const sector = cols[sectorLabelIdx];
+            const period = cols[timeLabelIdx];
+
+            if (value && sector && !sectorMap.has(sector)) {
+                sectorMap.set(sector, {
+                    sector: formatSectorName(sector),
+                    value: parseFloat(value).toFixed(1),
+                    period: formatPeriod(period),
+                    unit: 'Index (2019=100)'
+                });
+            }
         }
-    });
+    }
 
-    // Convert map to array and sort by sector name
+    // Convert to array and sort
     const result = Array.from(sectorMap.values()).sort((a, b) =>
         a.sector.localeCompare(b.sector)
     );
@@ -138,56 +169,124 @@ function processObservations(observationsData) {
     return result;
 }
 
+// Parse a CSV line handling quoted values
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+
+    result.push(current.trim());
+    return result;
+}
+
+// Convert mmm-yy to Date object
+function parseMonthYear(mmm_yy) {
+    const months = {
+        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+    };
+
+    const parts = mmm_yy.split('-');
+    if (parts.length !== 2) return new Date(0);
+
+    const month = months[parts[0]];
+    const year = 2000 + parseInt(parts[1]);
+
+    return new Date(year, month, 1);
+}
+
+// Format sector name to be more readable
+function formatSectorName(sector) {
+    // Remove quotes if present
+    sector = sector.replace(/^"(.*)"$/, '$1');
+
+    // Capitalize first letter of each word
+    return sector.split(' ').map(word =>
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
+}
+
+// Format period to be more readable
+function formatPeriod(period) {
+    // Remove quotes if present
+    return period.replace(/^"(.*)"$/, '$1');
+}
+
 // Fallback: Use mock data if API fails
 function getMockData() {
     return [
         {
-            sector: "All Retailing",
-            value: "112.3",
-            period: "December 2025",
-            unit: "Index (2016=100)"
+            sector: "All Retailing Including Automotive Fuel",
+            value: "100.6",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
+        },
+        {
+            sector: "All Retailing Excluding Automotive Fuel",
+            value: "100.9",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
         },
         {
             sector: "Predominantly Food Stores",
-            value: "108.7",
-            period: "December 2025",
-            unit: "Index (2016=100)"
+            value: "94.9",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
         },
         {
-            sector: "Predominantly Non-food Stores",
-            value: "109.4",
-            period: "December 2025",
-            unit: "Index (2016=100)"
+            sector: "Total Of Predominantly Non-food Stores",
+            value: "105.5",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
         },
         {
             sector: "Non-store Retailing",
-            value: "128.9",
-            period: "December 2025",
-            unit: "Index (2016=100)"
+            value: "105.6",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
         },
         {
-            sector: "Textile, Clothing and Footwear Stores",
-            value: "102.5",
-            period: "December 2025",
-            unit: "Index (2016=100)"
+            sector: "Textile, Clothing And Footwear Stores",
+            value: "101.5",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
         },
         {
             sector: "Household Goods Stores",
-            value: "98.6",
-            period: "December 2025",
-            unit: "Index (2016=100)"
+            value: "104.9",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
         },
         {
             sector: "Other Stores",
-            value: "115.3",
-            period: "December 2025",
-            unit: "Index (2016=100)"
+            value: "109.8",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
         },
         {
-            sector: "Automotive Fuel",
-            value: "95.2",
-            period: "December 2025",
-            unit: "Index (2016=100)"
+            sector: "Predominantly Automotive Fuel",
+            value: "97.8",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
+        },
+        {
+            sector: "Non-specialised Stores",
+            value: "104.8",
+            period: "Nov-25",
+            unit: "Index (2019=100)"
         }
     ];
 }
