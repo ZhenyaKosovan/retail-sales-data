@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UK Retail Sales Data</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>UK Retail Sales Data</h1>
+            <p class="description">View the latest retail sales statistics from the Office for National Statistics</p>
+        </header>
+
+        <main>
+            <div class="controls">
+                <button id="retrieveBtn" class="btn btn-primary">Retrieve Data</button>
+                <button id="downloadBtn" class="btn btn-secondary" disabled>Download Data</button>
+            </div>
+
+            <div id="spinner" class="spinner hidden">
+                <div class="spinner-circle"></div>
+                <p>Loading data...</p>
+            </div>
+
+            <div id="errorMessage" class="error-message hidden"></div>
+
+            <div id="dataGrid" class="data-grid"></div>
+        </main>
+
+        <footer>
+            <p>Data source: <a href="https://www.ons.gov.uk/" target="_blank" rel="noopener">Office for National Statistics</a></p>
+            <p class="disclaimer">This page uses the ONS Beta API. Data is subject to change and updates.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
