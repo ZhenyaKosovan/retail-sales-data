@@ -138,8 +138,9 @@ The application attempts to fetch live data from the ONS API. If the API is unav
 - **Rate Limits**: The ONS API may have rate limits (not documented)
 - **Data Freshness**: Data is updated according to ONS release schedule (typically monthly)
 - **Fallback Data**: If API fails, sample data is shown with a warning message
+- **Localhost CORS**: When running locally (http://localhost), the CSV download may fail due to CORS restrictions. The page will display sample data instead. **Live data works correctly on GitHub Pages (HTTPS)**.
 
-**Note**: The ONS API supports CORS, so the page works in all modern browsers without restrictions.
+**Note**: For the best experience with live data, use the GitHub Pages deployment rather than running locally.
 
 ## Data Source
 

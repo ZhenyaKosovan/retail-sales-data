@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Quick API Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f0f0f0; }
+        #log { background: white; padding: 20px; border: 1px solid #ccc; white-space: pre-wrap; }
+        .error { color: red; }
+        .success { color: green; }
+        button { padding: 10px 20px; font-size: 16px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Quick API Test</h1>
+    <button onclick="runTest()">Run Test</button>
+    <div id="log"></div>
+
+    <script>
+        const log = document.getElementById('log');
+
+        function print(msg, isError = false) {
+            const span = document.createElement('span');
+            span.className = isError ? 'error' : (msg.includes('✓') ? 'success' : '');
+            span.textContent = msg + '\n';
+            log.appendChild(span);
+            console.log(msg);
+        }
+
+        async function runTest() {
+            log.innerHTML = '';
+            print('Starting test...\n');
+
+            try {
+                // Test 1: Fetch metadata
+                print('1. Fetching metadata...');
+                const metaResp = await fetch('https://api.beta.ons.gov.uk/v1/datasets/retail-sales-index');
+                print(`   Status: ${metaResp.status} ${metaResp.statusText}`);
+
+                if (!metaResp.ok) {
+                    throw new Error(`Metadata fetch failed: ${metaResp.status}`);
+                }
+
+                const meta = await metaResp.json();
+                print(`   ✓ Got metadata for: ${meta.title}`);
+                print(`   Latest version: ${meta.links.latest_version.href}\n`);
+
+                // Test 2: Fetch CSV (just first 1000 chars)
+                print('2. Fetching CSV...');
+                const csvUrl = 'https://download.ons.gov.uk/downloads/datasets/retail-sales-index/editions/time-series/versions/43.csv';
+                const csvResp = await fetch(csvUrl);
+                print(`   Status: ${csvResp.status} ${csvResp.statusText}`);
+
+                if (!csvResp.ok) {
+                    throw new Error(`CSV fetch failed: ${csvResp.status}`);
+                }
+
+                const reader = csvResp.body.getReader();
+                const { value } = await reader.read();
+                const text = new TextDecoder().decode(value);
+                print(`   ✓ Got CSV data, first 200 chars:`);
+                print(`   ${text.substring(0, 200)}...\n`);
+
+                print('✅ SUCCESS! Both API and CSV are accessible.\n');
+                print('If the main page still fails, there may be a JavaScript error.');
+                print('Check the browser console for errors when clicking "Retrieve Data".');
+
+            } catch (err) {
+                print(`\n❌ FAILED: ${err.message}`, true);
+                print(`\nError details: ${err.stack}`, true);
+            }
+        }
+    </script>
+</body>
+</html>

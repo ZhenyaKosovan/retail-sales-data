@@ -421,7 +421,17 @@ async function handleRetrieveData() {
 
         // Use mock data as fallback
         console.log('Loading mock data as fallback...');
-        showError('Unable to fetch live data from ONS API. Displaying sample data instead.');
+
+        // Check if it's a CORS error
+        const isCorsError = error.message.includes('fetch') || error.message.includes('CORS');
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+        if (isCorsError && isLocalhost) {
+            showError('CORS restriction on localhost. Displaying sample data. (Live data works on GitHub Pages)');
+        } else {
+            showError('Unable to fetch live data from ONS API. Displaying sample data instead.');
+        }
+
         retailSalesData = getMockData();
         console.log('Mock data loaded:', retailSalesData.length, 'items');
         console.log('Mock data sample:', retailSalesData[0]);

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .log { padding: 5px; margin: 5px 0; background: #f0f0f0; }
+        .error { background: #ffcccc; }
+        .success { background: #ccffcc; }
+        button { padding: 10px 20px; margin: 10px 0; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h2>Retail Sales Data Test</h2>
+    <button id="testBtn">Test Data Fetch</button>
+    <div id="logs"></div>
+
+    <script>
+        const logs = document.getElementById('logs');
+
+        function log(message, type = 'log') {
+            console.log(message);
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = message;
+            logs.appendChild(div);
+        }
+
+        // Copy the actual functions from app.js
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+
+            result.push(current.trim());
+            return result;
+        }
+
+        function parseMonthYear(mmm_yy) {
+            const months = {
+                'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+            };
+
+            const parts = mmm_yy.split('-');
+            if (parts.length !== 2) return new Date(0);
+
+            const month = months[parts[0]];
+            const yearPart = parseInt(parts[1]);
+            const year = yearPart < 50 ? 2000 + yearPart : 1900 + yearPart;
+
+            return new Date(year, month, 1);
+        }
+
+        function formatSectorName(sector) {
+            sector = sector.replace(/^"(.*)"$/, '$1');
+            return sector.split(' ').map(word =>
+                word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            ).join(' ');
+        }
+
+        function formatPeriod(period) {
+            return period.replace(/^"(.*)"$/, '$1');
+        }
+
+        function parseCSVData(csvText) {
+            const lines = csvText.split('\n');
+
+            if (lines.length < 2) {
+                throw new Error('CSV file is empty or invalid');
+            }
+
+            const valueIdx = 0;
+            const timeCodeIdx = 2;
+            const timeLabelIdx = 3;
+            const sectorLabelIdx = 7;
+            const pricesCodeIdx = 8;
+
+            const timeSet = new Set();
+            for (let i = 1; i < lines.length; i++) {
+                const cols = parseCSVLine(lines[i]);
+                if (cols.length > timeCodeIdx && cols[timeCodeIdx]) {
+                    timeSet.add(cols[timeCodeIdx]);
+                }
+            }
+
+            const latestTime = Array.from(timeSet).sort((a, b) => {
+                const dateA = parseMonthYear(a);
+                const dateB = parseMonthYear(b);
+                return dateB - dateA;
+            })[0];
+
+            log(`Latest time: ${latestTime}`, 'log');
+
+            const sectorMap = new Map();
+
+            for (let i = 1; i < lines.length; i++) {
+                const cols = parseCSVLine(lines[i]);
+
+                if (cols.length <= pricesCodeIdx) continue;
+
+                const timeCode = cols[timeCodeIdx];
+                const pricesCode = cols[pricesCodeIdx];
+
+                if (timeCode === latestTime && pricesCode === 'chained-volume-of-retail-sales') {
+                    const value = cols[valueIdx];
+                    const sector = cols[sectorLabelIdx];
+                    const period = cols[timeLabelIdx];
+
+                    if (value && sector && !sectorMap.has(sector)) {
+                        sectorMap.set(sector, {
+                            sector: formatSectorName(sector),
+                            value: parseFloat(value).toFixed(1),
+                            period: formatPeriod(period),
+                            unit: 'Index (2019=100)'
+                        });
+                    }
+                }
+            }
+
+            const result = Array.from(sectorMap.values()).sort((a, b) =>
+                a.sector.localeCompare(b.sector)
+            );
+
+            return result;
+        }
+
+        async function testFetch() {
+            logs.innerHTML = '';
+            log('Starting test...', 'log');
+
+            try {
+                log('1. Fetching metadata...', 'log');
+                const metaResponse = await fetch('https://api.beta.ons.gov.uk/v1/datasets/retail-sales-index');
+
+                if (!metaResponse.ok) {
+                    throw new Error(`Metadata fetch failed: ${metaResponse.status}`);
+                }
+
+                const metadata = await metaResponse.json();
+                log('✓ Metadata fetched', 'success');
+
+                const latestVersion = metadata.links?.latest_version;
+                if (!latestVersion) {
+                    throw new Error('No latest version found');
+                }
+
+                const versionMatch = latestVersion.href.match(/editions\/([^/]+)\/versions\/(\d+)/);
+                if (!versionMatch) {
+                    throw new Error('Cannot parse version');
+                }
+
+                const edition = versionMatch[1];
+                const version = versionMatch[2];
+                log(`✓ Version: ${edition}/v${version}`, 'success');
+
+                log('2. Downloading CSV...', 'log');
+                const csvUrl = `https://download.ons.gov.uk/downloads/datasets/retail-sales-index/editions/${edition}/versions/${version}.csv`;
+
+                const csvResponse = await fetch(csvUrl);
+                if (!csvResponse.ok) {
+                    throw new Error(`CSV download failed: ${csvResponse.status}`);
+                }
+
+                const csvText = await csvResponse.text();
+                log(`✓ CSV downloaded: ${(csvText.length / 1024 / 1024).toFixed(2)} MB`, 'success');
+
+                log('3. Parsing CSV...', 'log');
+                const data = parseCSVData(csvText);
+
+                log(`✓ Found ${data.length} sectors`, 'success');
+
+                data.forEach((item, idx) => {
+                    log(`${idx + 1}. ${item.sector}: ${item.value}`, 'log');
+                });
+
+                log('✅ SUCCESS!', 'success');
+
+            } catch (error) {
+                log(`❌ ERROR: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        document.getElementById('testBtn').addEventListener('click', testFetch);
+        log('Click the button to test', 'log');
+    </script>
+</body>
+</html>
