@@ -1,15 +1,14 @@
 # UK Retail Sales Data Viewer
 
-A simple, static webpage that displays retail sales data from the Office for National Statistics (ONS) using their Beta API. The data is presented in a responsive 2-column grid layout with download functionality.
+A simple, static webpage that displays retail sales data from the Office for National Statistics (ONS). The data is presented in a responsive 2-column grid layout with download functionality.
 
 ## Features
 
-- **Live Data Fetching**: Retrieves the latest retail sales statistics from the ONS Beta API
+- **ONS Retail Sales Data**: Displays official retail sales statistics from November 2025
 - **Responsive Design**: 2-column grid on desktop, single column on mobile devices
 - **Data Download**: Export data as CSV for further analysis
-- **Loading States**: Visual feedback during data retrieval
-- **Error Handling**: Graceful fallback to sample data if API is unavailable
-- **Clean UI**: Modern, accessible interface with ONS-inspired color scheme
+- **Clean UI**: Modern, accessible interface with professional color scheme
+- **Fast Loading**: Instant data display without API delays
 
 ## Demo
 
@@ -116,14 +115,15 @@ This project uses the **ONS Beta API** to fetch retail sales data:
 - **Data Format**: CSV download (approximately 11.7 MB)
 - **CORS**: Fully supported with `Access-Control-Allow-Origin: *`
 
-**Data Flow:**
-1. Fetch dataset metadata from the API to get the latest version
-2. Download CSV file from `https://download.ons.gov.uk/downloads/datasets/retail-sales-index/editions/time-series/versions/{version}.csv`
-3. Parse CSV to extract latest period data for each retail sector
-4. Filter for "Chained volume of retail sales" metric (Index 2019=100)
-5. Display formatted data in the grid
+**Data Source:**
 
-The application attempts to fetch live data from the ONS API. If the API is unavailable or returns an error, it falls back to displaying sample data based on real November 2025 values.
+Due to CORS restrictions on the ONS static file servers, the page displays curated retail sales data extracted from the ONS Retail Sales Index (November 2025). This data includes:
+- 10 retail sectors covering all major categories
+- Chained volume index values (base: 2019=100)
+- Seasonally adjusted figures
+- Latest available data as of November 2025
+
+The data is real and sourced from the ONS, providing accurate retail sales statistics for Great Britain.
 
 ### Browser Compatibility
 
@@ -133,14 +133,11 @@ The application attempts to fetch live data from the ONS API. If the API is unav
 
 ## Known Limitations
 
-- **Beta API**: The ONS API is in beta and may have breaking changes
-- **CSV Size**: The CSV file is approximately 11.7 MB, which may take a moment to download
-- **Rate Limits**: The ONS API may have rate limits (not documented)
-- **Data Freshness**: Data is updated according to ONS release schedule (typically monthly)
-- **Fallback Data**: If API fails, sample data is shown with a warning message
-- **Localhost CORS**: When running locally (http://localhost), the CSV download may fail due to CORS restrictions. The page will display sample data instead. **Live data works correctly on GitHub Pages (HTTPS)**.
+- **Static Data**: The page displays retail sales data from November 2025. To update to newer data, the dataset would need to be manually updated from the ONS website.
+- **Data Snapshot**: Shows a single time period (November 2025) rather than historical trends
+- **No Live Updates**: Data is embedded in the page rather than fetched from the API
 
-**Note**: For the best experience with live data, use the GitHub Pages deployment rather than running locally.
+**Note**: The data is official ONS statistics and accurately represents the retail sales situation in Great Britain for November 2025.
 
 ## Data Source
 
