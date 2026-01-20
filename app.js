@@ -82,12 +82,17 @@ async function fetchRetailSalesData() {
         const version = versionMatch[2];
         console.log(`Latest version: ${edition}/v${version}`);
 
-        // Construct CSV download URL
-        const csvUrl = `https://download.ons.gov.uk/downloads/datasets/${datasetId}/editions/${edition}/versions/${version}.csv`;
+        // Construct CSV download URL - use static.ons.gov.uk directly to avoid redirect issues
+        const csvUrl = `https://static.ons.gov.uk/datasets/${datasetId}-${edition}-v${version}.csv`;
         console.log('Downloading CSV from:', csvUrl);
 
-        // Fetch CSV data
-        const csvResponse = await fetch(csvUrl);
+        // Fetch CSV data with mode: 'cors' to ensure CORS is handled
+        const csvResponse = await fetch(csvUrl, {
+            mode: 'cors',
+            headers: {
+                'Accept': 'text/csv'
+            }
+        });
         console.log('CSV response status:', csvResponse.status);
 
         if (!csvResponse.ok) {
