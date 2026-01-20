@@ -203,7 +203,10 @@ function parseMonthYear(mmm_yy) {
     if (parts.length !== 2) return new Date(0);
 
     const month = months[parts[0]];
-    const year = 2000 + parseInt(parts[1]);
+    const yearPart = parseInt(parts[1]);
+
+    // Handle two-digit years: 00-49 = 2000-2049, 50-99 = 1950-1999
+    const year = yearPart < 50 ? 2000 + yearPart : 1900 + yearPart;
 
     return new Date(year, month, 1);
 }
