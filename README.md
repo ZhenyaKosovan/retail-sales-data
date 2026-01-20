@@ -113,9 +113,17 @@ This project uses the **ONS Beta API** to fetch retail sales data:
 - **Base URL**: `https://api.beta.ons.gov.uk/v1`
 - **Dataset**: `retail-sales-index`
 - **Authentication**: Not required (open API)
-- **Data Format**: JSON
+- **Data Format**: CSV download (approximately 11.7 MB)
+- **CORS**: Fully supported with `Access-Control-Allow-Origin: *`
 
-The application attempts to fetch live data from the ONS API. If the API is unavailable or returns an error, it falls back to displaying sample data.
+**Data Flow:**
+1. Fetch dataset metadata from the API to get the latest version
+2. Download CSV file from `https://download.ons.gov.uk/downloads/datasets/retail-sales-index/editions/time-series/versions/{version}.csv`
+3. Parse CSV to extract latest period data for each retail sector
+4. Filter for "Chained volume of retail sales" metric (Index 2019=100)
+5. Display formatted data in the grid
+
+The application attempts to fetch live data from the ONS API. If the API is unavailable or returns an error, it falls back to displaying sample data based on real November 2025 values.
 
 ### Browser Compatibility
 
@@ -126,10 +134,12 @@ The application attempts to fetch live data from the ONS API. If the API is unav
 ## Known Limitations
 
 - **Beta API**: The ONS API is in beta and may have breaking changes
-- **CORS**: Some browsers may have CORS restrictions when running locally (use a local server)
+- **CSV Size**: The CSV file is approximately 11.7 MB, which may take a moment to download
 - **Rate Limits**: The ONS API may have rate limits (not documented)
 - **Data Freshness**: Data is updated according to ONS release schedule (typically monthly)
 - **Fallback Data**: If API fails, sample data is shown with a warning message
+
+**Note**: The ONS API supports CORS, so the page works in all modern browsers without restrictions.
 
 ## Data Source
 

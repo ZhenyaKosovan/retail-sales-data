@@ -391,14 +391,13 @@ async function handleRetrieveData() {
 }
 
 // Event listeners
-retrieveBtn.addEventListener('click', handleRetrieveData);
-downloadBtn.addEventListener('click', downloadData);
-
-// Prevent multiple rapid clicks
 let isLoading = false;
+
 retrieveBtn.addEventListener('click', async () => {
     if (isLoading) return;
     isLoading = true;
     await handleRetrieveData();
     isLoading = false;
 });
+
+downloadBtn.addEventListener('click', downloadData);
